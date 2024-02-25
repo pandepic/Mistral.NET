@@ -2,46 +2,17 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using MistralNET.Chat.DTO;
-using MistralNET.Utility;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 
 namespace MistralNET.Chat;
 
-public enum ChatMessageRole
+public class ChatResponseUsage
 {
-    System,
-    User,
-    Assistant,
-}
-
-public class ChatMessage
-{
-    public ChatMessageRole Role { get; set; }
-    public string Message { get; set; } = null!;
-    public int? Tokens { get; set; }
-    public decimal? EstimatedCost { get; set; }
-
-    public ChatMessage() { }
-
-    public ChatMessage(ChatMessageRole role, string message)
-    {
-        Role = role;
-        Message = message;
-    }
-
-    public ChatAPIRequestMessage CreateAPIRequestMessage()
-    {
-        return new()
-        {
-            role = EnumUtility.GetChatMessageRoleString(Role),
-            content = Message,
-        };
-    }
-
-    public static ChatMessage FromSystem(string message) => new ChatMessage(ChatMessageRole.System, message);
-    public static ChatMessage FromUser(string message) => new ChatMessage(ChatMessageRole.User, message);
-    public static ChatMessage FromAssistant(string message) => new ChatMessage(ChatMessageRole.Assistant, message);
+    public int PromptTokens { get; set; }
+    public int ResponseTokens { get; set; }
+    public decimal PromptCost { get; set; }
+    public decimal ResponseCost { get; set; }
 }
 
 public class ChatConversation
@@ -85,6 +56,26 @@ public class ChatConversation
 
         TopP = topP;
     }
+    
+    public int GetTotalPromptTokens()
+    {
+        var model = GetModel();
+        
+        // gpt-4 encoding seems to also work with mistral for now
+        var encoding = SharpToken.GptEncoding.GetEncodingForModel("gpt-4");
+
+        var tokens = 0;
+
+        foreach (var message in Messages)
+        {
+            tokens += message.GetTokenCount(encoding);
+            tokens += model.TokensPerMessage ?? 0;
+        }
+
+        tokens += model.ResponseTokensPadding ?? 0;
+
+        return tokens;
+    }
 
     public ChatAPIRequest CreateAPIRequest(
         bool safePrompt = false,
@@ -106,7 +97,7 @@ public class ChatConversation
         return request;
     }
 
-    public async Task<ChatMessage?> GetNextAssistantMessageAsync(
+    public async Task<(ChatMessage?, ChatResponseUsage?)> GetNextAssistantMessageAsync(
         bool safePrompt = false,
         int? maxTokens = null,
         TimeSpan? timeout = null)
@@ -115,6 +106,7 @@ public class ChatConversation
         var jsonFormatting = Formatting.None;
 
         ChatMessage? message = null;
+        ChatResponseUsage? usage = null;
 
 #if DEBUG
         jsonFormatting = Formatting.Indented;
@@ -147,12 +139,20 @@ public class ChatConversation
 
                 message.EstimatedCost = promptCost + responseCost;
                 message.Tokens = response.usage.completion_tokens;
+
+                usage = new ChatResponseUsage
+                {
+                    PromptTokens = response.usage.prompt_tokens,
+                    ResponseTokens = response.usage.completion_tokens,
+                    PromptCost = promptCost,
+                    ResponseCost = responseCost,
+                };
             }
         }
 
         if (response != null && response.usage != null)
             TotalTokens = response.usage.total_tokens;
 
-        return message;
+        return (message, usage);
     }
 }

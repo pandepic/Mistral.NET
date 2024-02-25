@@ -17,7 +17,9 @@ public class MistralModel
     public int MaxTokens;
     public decimal InputPricePer1kTokens; // in EUR
     public decimal OutputPricePer1kTokens; // in EUR
-
+    public int? ResponseTokensPadding;
+    public int? TokensPerMessage;
+    
     public static readonly Dictionary<MistralModelType, MistralModel> Models = new()
     {
         {
@@ -29,6 +31,8 @@ public class MistralModel
                 MaxTokens = 32000,
                 InputPricePer1kTokens = 0.00014m,
                 OutputPricePer1kTokens = 0.00042m,
+                ResponseTokensPadding = 6,
+                TokensPerMessage = 8,
             }
         },
         {
@@ -40,6 +44,8 @@ public class MistralModel
                 MaxTokens = 32000,
                 InputPricePer1kTokens = 0.0006m,
                 OutputPricePer1kTokens = 0.0018m,
+                ResponseTokensPadding = 6,
+                TokensPerMessage = 8,
             }
         },
         {
@@ -51,6 +57,8 @@ public class MistralModel
                 MaxTokens = 32000,
                 InputPricePer1kTokens = 0.0025m,
                 OutputPricePer1kTokens = 0.0075m,
+                ResponseTokensPadding = 6,
+                TokensPerMessage = 5,
             }
         },
         {
